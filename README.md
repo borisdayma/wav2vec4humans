@@ -22,7 +22,7 @@
 
   Note: you can launch as many agents as your machine handles, and use other machines. Just don't recreate another sweep and use the same sweep id.
 
-## TODO
+## TODO's (PR welcome)
 
 * apply [this trick](https://huggingface.slack.com/archives/C01QZ90Q83Z/p1616343320403900) to avoid reprocessing data but with torchaudio
 * find a better way than early stopping callback to stop training if loss is NaN:
