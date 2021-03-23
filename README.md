@@ -1,3 +1,6 @@
+Sweeps ongoing:
+* [Random search to understand which hyper-parameters matter](https://wandb.ai/wandb/xlsr/sweeps/1yovh01j)
+
 ## Instructions
 
 * install requirements (requires `master` branch of `transformers)
