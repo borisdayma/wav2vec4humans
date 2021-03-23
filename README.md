@@ -4,8 +4,9 @@
 
   `pip install wandb datasets==1.4.1 torchaudio librosa jiwer`
   `pip install git+https://github.com/huggingface/transformers`
+  `pip install --upgrade torch==1.8.0+cu111 torchvision==0.9.0+cu111 torchaudio==0.8.0 -f https://download.pytorch.org/whl/torch_stable.html`
 
-  Note: good to use a virtual env (I like pipenv)
+  Note: use your torch install instructions (without it I was getting some cudnn issues). Also it's always good to use a virtual env (I like pipenv).
 
 * define your sweep configuration file (see `sweep.yaml`)
 
