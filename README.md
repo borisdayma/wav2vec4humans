@@ -27,10 +27,9 @@ Sweeps ongoing:
 
 ## TODO's (PR welcome)
 
-* seems like adding the early stopping callback stopped logging the training loss, not sure why
 * apply [this trick](https://huggingface.slack.com/archives/C01QZ90Q83Z/p1616343320403900) to avoid reprocessing data but with torchaudio
-* find a better way than early stopping callback to stop training if loss is NaN:
-  * build a custom callback?
-  * raise an exception within the logging callback -> should be easy but hacky (no problem with that!)
+* find a better way than early stopping callback to stop training if loss is NaN (happens a lot):
+  * build a custom callback? Seems easy looking at EarlyStoppingCallback test files
+  * raise an exception within the logging callback -> should be easy but hacky
 * upload tokenizer and preprocessor files ("extra" folder) as W&B artifacts at the end of training (currently only best model files are uploaded)
 * show how to use sweeps in a notebook (it uses slightly more resources which was creating issues on my local machine and pushed me towards the "script" route)
