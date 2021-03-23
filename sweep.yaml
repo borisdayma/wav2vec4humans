@@ -1,0 +1,45 @@
+program: train.py
+# if using a common dashboard, you can use wandb. By default it's your own workspace
+entity: wandb
+# if using wandb dashboards, check created dashboards such as xlsr-french
+project: xlsr
+# right now I do random but if you're in optimizing phase, you could try "bayes"
+method: random
+metric:
+  name: eval/wer
+  goal: minimize
+parameters:
+  attention_dropout:
+    distribution: log_uniform
+    # from 0.1/2 to 0.1*2 - values provided are ln(min) -> ln(max)
+    min: -3.
+    max: -1.6
+  activation_dropout:
+    distribution: log_uniform
+    min: -3.
+    max: -1.6
+  hidden_dropout:
+    distribution: log_uniform
+    min: -3.
+    max: -1.6
+  feat_proj_dropout:
+    distribution: log_uniform
+    min: -3.
+    max: -1.6
+  mask_time_prob:
+    distribution: log_uniform
+    # from 0.1/2 to 0.1*2 - values provided are ln(min) -> ln(max)
+    min: -4.1
+    max: -1.9
+  layerdrop:
+    distribution: log_uniform
+    min: -3.
+    max: -1.6
+  learning_rate:
+    distribution: log_uniform
+    min: -9.2
+    max: -6.9
+  gradient_accumulation_steps:
+    distribution: int_uniform
+    min: 1
+    max: 4
