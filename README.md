@@ -27,6 +27,7 @@ Sweeps ongoing:
 
 ## TODO's (PR welcome)
 
+* seems like adding the early stopping callback stopped logging the training loss, not sure why
 * apply [this trick](https://huggingface.slack.com/archives/C01QZ90Q83Z/p1616343320403900) to avoid reprocessing data but with torchaudio
 * find a better way than early stopping callback to stop training if loss is NaN:
   * build a custom callback?
