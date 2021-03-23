@@ -1,6 +1,10 @@
 Sweeps ongoing:
 * [Random search to understand which hyper-parameters matter](https://wandb.ai/wandb/xlsr/sweeps/1yovh01j)
 
+  Notes:
+  * uses the turkish dataset for 3 epochs, 500 warmup steps and batch size of 16 (only constants except for optimizer parameters)
+  * worthwhile to look at parallel graph with `train/loss` as metric (to just know when NaN happens)
+
 ## Instructions
 
 * install requirements (requires `master` branch of `transformers)
