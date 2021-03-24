@@ -7,6 +7,10 @@ Sweeps ongoing:
 
   `pip install -r requirements.txt`
 
+* make sure you're logged into W&B
+
+  `wandb login`
+
 * define your sweep configuration file (see `sweep.yaml`)
 
 * create a sweep -> this will return a sweep id
