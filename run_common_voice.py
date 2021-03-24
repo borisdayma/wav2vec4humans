@@ -528,8 +528,7 @@ def main():
     test_dataset = test_dataset.map(test_speech_file_to_array_fn)
     result = test_dataset.map(evaluate, batched=True, batch_size=8)
     test_wer = wer_metric.compute(predictions=result["pred_strings"], references=result["sentence"])
-    metrics = {'test/wer': test_wer}
-    trainer.log_metrics("test", metrics)
+    wandb.log({'test/wer': test_wer})
     trainer.save_metrics("test", metrics)
 
     # save model files
@@ -537,7 +536,7 @@ def main():
     for f in Path(training_args.output_dir).iterdir():
         if f.is_file():
             artifact.add_file(f)
-    wandb.run.log_artifact(artifact)    
+    wandb.run.log_artifact(artifact)
 
 if __name__ == "__main__":
     main()
