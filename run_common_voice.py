@@ -394,7 +394,7 @@ def main():
     resampler = torchaudio.transforms.Resample(48_000, 16_000)
 
     # Preprocessing the datasets.
-    # We need to read the aduio files as arrays and tokenize the targets.
+    # We need to read the audio files as arrays and tokenize the targets.
     def speech_file_to_array_fn(batch):
         speech_array, sampling_rate = torchaudio.load(batch["path"])
         batch["speech"] = resampler(speech_array).squeeze().numpy()
@@ -525,7 +525,7 @@ def main():
     
     model.to("cuda")
     test_dataset = datasets.load_dataset("common_voice", data_args.dataset_config_name, split="test")
-    test_dataset = test_dataset.map(speech_file_to_array_fn)
+    test_dataset = test_dataset.map(test_speech_file_to_array_fn)
     result = test_dataset.map(evaluate, batched=True, batch_size=8)
     test_wer = wer_metric.compute(predictions=result["pred_strings"], references=result["sentence"])
     metrics = {'test/wer': test_wer}
