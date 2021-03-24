@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import wandb
 import json
 import logging
 import os
@@ -494,7 +495,6 @@ def main():
         trainer.save_state()
 
     # Evaluation
-    results = {}
     if training_args.do_eval:
         logger.info("*** Evaluate ***")
         metrics = trainer.evaluate()
@@ -503,8 +503,33 @@ def main():
 
         trainer.log_metrics("eval", metrics)
         trainer.save_metrics("eval", metrics)
+    
+    # Final test metrics    
+    def test_speech_file_to_array_fn(batch):
+        batch["sentence"] = re.sub(chars_to_ignore_regex, '', batch["sentence"]).lower()
+        speech_array, sampling_rate = torchaudio.load(batch["path"])
+        batch["speech"] = resampler(speech_array).squeeze().numpy()
+        return batch
+    
+    def evaluate(batch):
+        inputs = processor(batch["speech"], sampling_rate=16_000, return_tensors="pt", padding=True)
+        with torch.no_grad():
+            logits = model(inputs.input_values.to("cuda"), attention_mask=inputs.attention_mask.to("cuda")).logits
+        pred_ids = torch.argmax(logits, dim=-1)
+        batch["pred_strings"] = processor.batch_decode(pred_ids)
+        return batch
+    
+    model.to("cuda")
+    test_dataset = datasets.load_dataset("common_voice", data_args.dataset_config_name, split="test")
+    test_dataset = test_dataset.map(speech_file_to_array_fn)
+    result = test_dataset.map(evaluate, batched=True, batch_size=8)
+    test_wer = wer_metric.compute(predictions=result["pred_strings"], references=result["sentence"])
+    wandb.log({'test/wer': test_wer})
 
-    return results
+    # save model files
+    artifact = wandb.Artifact(name=f"model-{wandb.run.id}", type="model", metadata={'wer': test_wer})
+    artifact.add_dir(training_args.output_dir)
+    return
 
 
 if __name__ == "__main__":
