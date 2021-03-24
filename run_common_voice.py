@@ -529,6 +529,7 @@ def main():
     result = test_dataset.map(evaluate, batched=True, batch_size=8)
     test_wer = wer_metric.compute(predictions=result["pred_strings"], references=result["sentence"])
     wandb.log({'test/wer': test_wer})
+    metrics = {'wer': test_wer}
     trainer.save_metrics("test", metrics)
 
     # save model files
