@@ -67,7 +67,6 @@ command:
   - "--group_by_length"
   - "--gradient_checkpointing"
   - "--do_train"
-  - "--do_eval"
   - "--save_total_limit"
   - 1
   - "--logging_steps"
