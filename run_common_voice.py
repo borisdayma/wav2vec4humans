@@ -537,6 +537,7 @@ def main():
     for f in Path(training_args.output_dir).iterdir():
         if f.is_file():
             artifact.add_file(f)
+    wandb.run.log_artifact(artifact)    
 
 if __name__ == "__main__":
     main()
