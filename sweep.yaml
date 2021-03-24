@@ -12,29 +12,30 @@ parameters:
   attention_dropout:
     distribution: log_uniform
     # from 0.1/2 to 0.1*2 - values provided are ln(min) -> ln(max)
-    min: -3.
-    max: -1.6
+    min: -3.4
+    max: -1.6%2
   activation_dropout:
     distribution: log_uniform
-    min: -3.
-    max: -1.6
+    min: -3.4
+    max: -1.2
   hidden_dropout:
     distribution: log_uniform
-    min: -3.
-    max: -1.6
+    min: -3.4
+    max: -1.2
   feat_proj_dropout:
     distribution: log_uniform
-    min: -3.
-    max: -1.6
+    min: -3.4
+    max: -1.2
   mask_time_prob:
     distribution: log_uniform
     # from 0.05/2 to 0.05*2 - values provided are ln(min) -> ln(max)
-    min: -3.7
-    max: -2.3
+    min: -4.1
+    max: -1.9
   layerdrop:
     distribution: log_uniform
-    min: -3.
-    max: -1.6
+    # from 0.05/2 to 0.05*2 - values provided are ln(min) -> ln(max)
+    min: -3.4
+    max: -1.2
   learning_rate:
     distribution: log_uniform
     min: -9.2
@@ -56,7 +57,7 @@ command:
   - "--num_train_epochs"
   - 5
   - "--per_device_train_batch_size"
-  - 8
+  - 16
   - "--evaluation_strategy"
   - "epoch"
   - "--num_train_epochs"
