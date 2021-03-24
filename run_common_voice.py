@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import sys
+from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Union
 
@@ -524,13 +525,15 @@ def main():
     test_dataset = test_dataset.map(speech_file_to_array_fn)
     result = test_dataset.map(evaluate, batched=True, batch_size=8)
     test_wer = wer_metric.compute(predictions=result["pred_strings"], references=result["sentence"])
-    wandb.log({'test/wer': test_wer})
+    metrics = {'test/wer': test_wer}
+    trainer.log_metrics("test", metrics)
+    trainer.save_metrics("test", metrics)
 
     # save model files
     artifact = wandb.Artifact(name=f"model-{wandb.run.id}", type="model", metadata={'wer': test_wer})
-    artifact.add_dir(training_args.output_dir)
-    return
-
+    for f in Path(training_args.output_dir).iterdir():
+        if f.is_file():
+            artifact.add_file(f)
 
 if __name__ == "__main__":
     main()
