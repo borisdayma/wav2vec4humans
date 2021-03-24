@@ -79,4 +79,6 @@ command:
   - "wer"
   - "--greater_is_better"
   - "False"
+  - "--preprocessing_num_workers"
+  - 4
   - ${args}
