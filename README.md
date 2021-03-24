@@ -1,5 +1,5 @@
 Sweeps ongoing:
-* [Random search to understand which hyper-parameters matter](https://wandb.ai/wandb/xlsr/sweeps/1yovh01j)
+* [Random search to understand which hyper-parameters matter](https://wandb.ai/wandb/xlsr/sweeps/p23j88jo?workspace=user-borisd13)
 
 ## Instructions
 
