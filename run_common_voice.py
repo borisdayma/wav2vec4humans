@@ -508,7 +508,9 @@ def main():
         trainer.log_metrics("eval", metrics)
         trainer.save_metrics("eval", metrics)
     
-    # Final test metrics    
+    # Final test metrics
+    logger.info("*** Test ***")
+
     def test_speech_file_to_array_fn(batch):
         batch["sentence"] = re.sub(chars_to_ignore_regex, '', batch["sentence"]).lower()
         speech_array, sampling_rate = torchaudio.load(batch["path"])
@@ -531,6 +533,7 @@ def main():
     wandb.log({'test/wer': test_wer})
     metrics = {'wer': test_wer}
     trainer.save_metrics("test", metrics)
+    logger.info(f'test_loss = {test_wer}')
 
     # save model files
     artifact = wandb.Artifact(name=f"model-{wandb.run.id}", type="model", metadata={'wer': test_wer})
