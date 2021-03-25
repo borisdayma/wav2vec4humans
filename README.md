@@ -1,5 +1,9 @@
+# xlsr-sweeps - Fine-tune wav2vec2 using W&B sweeps
+
 Sweeps ongoing:
 * [Random search to understand which hyper-parameters matter](https://wandb.ai/wandb/xlsr/sweeps/p23j88jo?workspace=user-borisd13)
+
+  ![sweep](img/sweep.png)
 
 ## Instructions
 
