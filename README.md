@@ -17,10 +17,6 @@ Sweeps ongoing:
 
   `wandb sweep sweep.yaml`
 
-* launch an agent against the sweep (see the return from previous command)
+* launch an agent against the sweep
 
   `wandb agent my_sweep_id`
-
-  Notes:
-  * you can launch as many agents as your machine handles, and use other machines. Just don't recreate another sweep and use the same sweep id.
-  * if you want to add runs to my ongoing sweep (and didn't change this repo), you can launch `wandb agent wandb/xlsr/1yovh01j`
