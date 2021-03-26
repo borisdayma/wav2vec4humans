@@ -1,0 +1,79 @@
+program: run_common_voice.py
+# if using a common dashboard, you can use wandb ; if unspecified, it's your own workspace
+entity: wandb
+# if using wandb dashboards, check created dashboards such as xlsr-french
+project: xlsr
+# right now I do a random search but if you're in optimizing phase, you could try "bayes"
+method: bayes
+metric:
+  name: test/wer
+  goal: minimize
+parameters:
+  attention_dropout:
+    distribution: log_uniform
+    # from 0.1/2 to 0.1*2 - values provided are ln(min) -> ln(max)
+    min: -3.
+    max: -1.2
+  activation_dropout:
+    distribution: log_uniform
+    min: -3.5
+    max: -1.9
+  hidden_dropout:
+    distribution: log_uniform
+    min: -4.6
+    max: -2.5
+  feat_proj_dropout:
+    distribution: log_uniform
+    min: -4.6
+    max: -1.4
+  mask_time_prob:
+    distribution: log_uniform
+    # from 0.05/2 to 0.05*2 - values provided are ln(min) -> ln(max)
+    min: -3.9
+    max: -2.
+  layerdrop:
+    distribution: log_uniform
+    # from 0.05/2 to 0.05*2 - values provided are ln(min) -> ln(max)
+    min: -4.6
+    max: -2.3
+  learning_rate:
+    distribution: log_uniform
+    min: -8.5
+    max: -7.1
+  gradient_accumulation_steps:
+    distribution: int_uniform
+    min: 2
+    max: 4
+command:
+  - python
+  - ${program}
+  - "--model_name_or_path"
+  - "facebook/wav2vec2-large-xlsr-53"
+  - "--dataset_config_name"
+  - "fr"
+  - "--output_dir"
+  - "./model"
+  - "--overwrite_output_dir"
+  - "--num_train_epochs"
+  - 3
+  - "--per_device_train_batch_size"
+  - 16
+  - "--evaluation_strategy"
+  - "epoch"
+  - "--fp16"
+  - "--freeze_feature_extractor"
+  - "--group_by_length"
+  - "--gradient_checkpointing"
+  - "--do_train"
+  - "--save_total_limit"
+  - 1
+  - "--logging_steps"
+  - 100
+  - "--warmup_steps"
+  - 500
+  - "--load_best_model_at_end"
+  - "--metric_for_best_model"
+  - "wer"
+  - "--greater_is_better"
+  - "False"
+  - ${args}
