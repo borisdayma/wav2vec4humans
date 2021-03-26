@@ -55,13 +55,11 @@ command:
   - "./model"
   - "--overwrite_output_dir"
   - "--num_train_epochs"
-  - 5
+  - 10
   - "--per_device_train_batch_size"
   - 16
   - "--evaluation_strategy"
   - "epoch"
-  - "--num_train_epochs"
-  - 10
   - "--fp16"
   - "--freeze_feature_extractor"
   - "--group_by_length"
