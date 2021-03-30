@@ -3,7 +3,6 @@ program: run_common_voice.py
 entity: wandb
 # if using wandb dashboards, check created dashboards such as xlsr-french
 project: xlsr
-# right now I do a random search but if you're in optimizing phase, you could try "bayes"
 method: bayes
 metric:
   name: test/wer
