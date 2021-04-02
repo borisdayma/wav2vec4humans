@@ -401,7 +401,11 @@ def main():
         batch["speech"] = resampler(speech_array).squeeze().numpy()
         batch["sampling_rate"] = 16_000
         batch["target_text"] = batch["text"]
+        batch["duration"] = len(batch["speech"]) / sampling_rate
         return batch
+    
+    def filter_by_max_duration(batch):
+        return batch["duration"] <= 10  # about 98% of samples
 
     train_dataset = train_dataset.map(
         speech_file_to_array_fn,
@@ -413,6 +417,9 @@ def main():
         remove_columns=eval_dataset.column_names,
         num_proc=data_args.preprocessing_num_workers,
     )
+
+    train_dataset = train_dataset.filter(filter_by_max_duration, remove_columns=["duration"])
+    eval_dataset = eval_dataset.filter(filter_by_max_duration, remove_columns=["duration"])
 
     def prepare_dataset(batch):
         # check that all files have the correct sampling rate
@@ -530,7 +537,7 @@ def main():
     model.to("cuda")
     test_dataset = datasets.load_dataset("common_voice", data_args.dataset_config_name, split="test")
     test_dataset = test_dataset.map(test_speech_file_to_array_fn)
-    result = test_dataset.map(evaluate, batched=True, batch_size=8)
+    result = test_dataset.map(evaluate, batched=True, batch_size=1)     # some samples are very long
     test_wer = wer_metric.compute(predictions=result["pred_strings"], references=result["sentence"])
     wandb.log({'test/wer': test_wer})
     metrics = {'wer': test_wer}
