@@ -137,7 +137,7 @@ class DataTrainingArguments:
         },
     )
     chars_to_ignore: List[str] = list_field(
-        default=['"', "()", "[]", "`", "_", "+/=%"],
+        default=['"', "()", "[\]", "`", "_", "+/=%|"],
         metadata={"help": "A list of characters to remove from the transcripts."},
     )
 
@@ -319,8 +319,8 @@ def main():
     chars_to_ignore_regex = f'[{"".join(data_args.chars_to_ignore)}]'
 
     def remove_special_characters(batch):
-        batch["text"] = re.sub(chars_to_ignore_regex, "", unidecode(batch["sentence"])).lower() + " "
-        batch["text"] = re.sub("&", "and", batch["text"])
+        val = re.sub(chars_to_ignore_regex, "", unidecode(batch["sentence"]).lower()) + " "
+        batch["text"] = re.sub("&", "and", val)
         return batch
 
     train_dataset = train_dataset.map(remove_special_characters, remove_columns=["sentence"])
@@ -401,11 +401,11 @@ def main():
         batch["speech"] = resampler(speech_array).squeeze().numpy()
         batch["sampling_rate"] = 16_000
         batch["target_text"] = batch["text"]
-        batch["duration"] = len(batch["speech"]) / sampling_rate
+        batch["duration"] = len(speech_array.squeeze()) / sampling_rate
         return batch
     
-    def filter_by_max_duration(batch):
-        return batch["duration"] <= 10  # about 98% of samples
+    def filter_by_duration(batch):
+        return batch["duration"] <= 10 and batch["duration"] >= 0.1  # about 98% of samples
 
     train_dataset = train_dataset.map(
         speech_file_to_array_fn,
@@ -418,8 +418,8 @@ def main():
         num_proc=data_args.preprocessing_num_workers,
     )
 
-    train_dataset = train_dataset.filter(filter_by_max_duration, remove_columns=["duration"])
-    eval_dataset = eval_dataset.filter(filter_by_max_duration, remove_columns=["duration"])
+    train_dataset = train_dataset.filter(filter_by_duration, remove_columns=["duration"])
+    eval_dataset = eval_dataset.filter(filter_by_duration, remove_columns=["duration"])
 
     def prepare_dataset(batch):
         # check that all files have the correct sampling rate
