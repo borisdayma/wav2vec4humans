@@ -15,6 +15,7 @@ import torch
 import torchaudio
 from packaging import version
 from torch import nn
+from unidecode import unidecode
 
 import transformers
 from transformers import (
@@ -136,7 +137,7 @@ class DataTrainingArguments:
         },
     )
     chars_to_ignore: List[str] = list_field(
-        default=[",", "?", ".", "!", "-", ";", ":", '""', "%", "'", '"', "�"],
+        default=['"', "()", "[\]", "`", "_", "+/=%|"],
         metadata={"help": "A list of characters to remove from the transcripts."},
     )
 
@@ -271,7 +272,7 @@ def main():
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     
     # override default run name
-    wandb.init()
+    wandb.init(project = 'xlsr')
 
     # Detecting last checkpoint.
     last_checkpoint = None
@@ -318,8 +319,9 @@ def main():
     # Create and save tokenizer
     chars_to_ignore_regex = f'[{"".join(data_args.chars_to_ignore)}]'
 
-    def remove_special_characters(batch):
-        batch["text"] = re.sub(chars_to_ignore_regex, "", batch["sentence"]).lower() + " "
+    def remove_special_characters(batch, train=True):
+        val = re.sub(chars_to_ignore_regex, "", unidecode(batch["sentence"])).lower()
+        batch["text"] = re.sub("&", "and", val + " " if train else val)
         return batch
 
     train_dataset = train_dataset.map(remove_special_characters, remove_columns=["sentence"])
@@ -391,16 +393,27 @@ def main():
     if data_args.max_val_samples is not None:
         eval_dataset = eval_dataset.select(range(data_args.max_val_samples))
 
-    resampler = torchaudio.transforms.Resample(48_000, 16_000)
+    resampler = dict()
+    def get_resampler(sampling_rate):
+        if sampling_rate in resampler.keys():
+            return resampler[sampling_rate]
+        else:
+            logger.info(f'Creating new resampler for {sampling_rate}')
+            resampler[sampling_rate] = torchaudio.transforms.Resample(sampling_rate, 16_000)
+            return resampler[sampling_rate]
 
     # Preprocessing the datasets.
     # We need to read the audio files as arrays and tokenize the targets.
     def speech_file_to_array_fn(batch):
         speech_array, sampling_rate = torchaudio.load(batch["path"])
-        batch["speech"] = resampler(speech_array).squeeze().numpy()
+        batch["speech"] = get_resampler(sampling_rate)(speech_array).squeeze().numpy()
         batch["sampling_rate"] = 16_000
         batch["target_text"] = batch["text"]
+        batch["duration"] = len(speech_array.squeeze()) / sampling_rate
         return batch
+    
+    def filter_by_duration(batch):
+        return batch["duration"] <= 10 and batch["duration"] >= 0.5  # about 98% of samples
 
     train_dataset = train_dataset.map(
         speech_file_to_array_fn,
@@ -412,6 +425,9 @@ def main():
         remove_columns=eval_dataset.column_names,
         num_proc=data_args.preprocessing_num_workers,
     )
+
+    train_dataset = train_dataset.filter(filter_by_duration, remove_columns=["duration"])
+    eval_dataset = eval_dataset.filter(filter_by_duration, remove_columns=["duration"])
 
     def prepare_dataset(batch):
         # check that all files have the correct sampling rate
@@ -434,7 +450,7 @@ def main():
     eval_dataset = eval_dataset.map(
         prepare_dataset,
         remove_columns=eval_dataset.column_names,
-        batch_size=training_args.per_device_train_batch_size,
+        batch_size=training_args.per_device_eval_batch_size,
         batched=True,
         num_proc=data_args.preprocessing_num_workers,
     )
@@ -497,24 +513,13 @@ def main():
         trainer.log_metrics("train", metrics)
         trainer.save_metrics("train", metrics)
         trainer.save_state()
-
-    # Evaluation
-    if training_args.do_eval:
-        logger.info("*** Evaluate ***")
-        metrics = trainer.evaluate()
-        max_val_samples = data_args.max_val_samples if data_args.max_val_samples is not None else len(eval_dataset)
-        metrics["eval_samples"] = min(max_val_samples, len(eval_dataset))
-
-        trainer.log_metrics("eval", metrics)
-        trainer.save_metrics("eval", metrics)
     
     # Final test metrics
     logger.info("*** Test ***")
 
     def test_speech_file_to_array_fn(batch):
-        batch["sentence"] = re.sub(chars_to_ignore_regex, '', batch["sentence"]).lower()
-        speech_array, sampling_rate = torchaudio.load(batch["path"])
-        batch["speech"] = resampler(speech_array).squeeze().numpy()
+        batch = remove_special_characters(batch, train=False)
+        batch = speech_file_to_array_fn(batch)
         return batch
     
     def evaluate(batch):
@@ -527,19 +532,24 @@ def main():
     
     model.to("cuda")
     test_dataset = datasets.load_dataset("common_voice", data_args.dataset_config_name, split="test")
-    test_dataset = test_dataset.map(test_speech_file_to_array_fn)
-    result = test_dataset.map(evaluate, batched=True, batch_size=8)
-    test_wer = wer_metric.compute(predictions=result["pred_strings"], references=result["sentence"])
+    test_dataset = test_dataset.map(test_speech_file_to_array_fn,
+        remove_columns=test_dataset.column_names,
+        num_proc=data_args.preprocessing_num_workers,
+    )
+    test_dataset = test_dataset.filter(filter_by_duration, remove_columns=["duration"])
+
+    result = test_dataset.map(evaluate, batched=True, batch_size=training_args.per_device_eval_batch_size)
+    test_wer = wer_metric.compute(predictions=result["pred_strings"], references=result["text"])
     wandb.log({'test/wer': test_wer})
     metrics = {'wer': test_wer}
     trainer.save_metrics("test", metrics)
-    logger.info(f'test_loss = {test_wer}')
+    logger.info(f'test/wer = {test_wer}')
 
     # save model files
     artifact = wandb.Artifact(name=f"model-{wandb.run.id}", type="model", metadata={'wer': test_wer})
     for f in Path(training_args.output_dir).iterdir():
         if f.is_file():
-            artifact.add_file(f)
+            artifact.add_file(str(f))
     wandb.run.log_artifact(artifact)
 
 if __name__ == "__main__":
