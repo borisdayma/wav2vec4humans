@@ -305,7 +305,7 @@ def main():
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     # override default run name
-    wandb.init(project="xlsr")
+    wandb.init(project="xlsr-en-punctuation", config=parser.parse_args())
 
     # Detecting last checkpoint.
     last_checkpoint = None
@@ -518,7 +518,7 @@ def main():
     )
 
     # Metric
-    wer_metric = datasets.load_metric("wer")
+    cer_metric = datasets.load_metric("cer")
 
     def compute_metrics(pred):
         pred_logits = pred.predictions
@@ -530,9 +530,9 @@ def main():
         # we do not want to group tokens when computing the metrics
         label_str = processor.batch_decode(pred.label_ids, group_tokens=False)
 
-        wer = wer_metric.compute(predictions=pred_str, references=label_str)
+        cer = cer_metric.compute(predictions=pred_str, references=label_str)
 
-        return {"wer": wer}
+        return {"cer": cer}
 
     if model_args.freeze_feature_extractor:
         model.freeze_feature_extractor()
@@ -613,17 +613,17 @@ def main():
     result = test_dataset.map(
         evaluate, batched=True, batch_size=training_args.per_device_eval_batch_size
     )
-    test_wer = wer_metric.compute(
+    test_cer = cer_metric.compute(
         predictions=result["pred_strings"], references=result["text"]
     )
-    wandb.log({"test/wer": test_wer})
-    metrics = {"wer": test_wer}
+    wandb.log({"test/cer": test_cer})
+    metrics = {"cer": test_cer}
     trainer.save_metrics("test", metrics)
-    logger.info(f"test/wer = {test_wer}")
+    logger.info(f"test/cer = {test_cer}")
 
     # save model files
     artifact = wandb.Artifact(
-        name=f"model-{wandb.run.id}", type="model", metadata={"wer": test_wer}
+        name=f"model-{wandb.run.id}", type="model", metadata={"cer": test_cer}
     )
     for f in Path(training_args.output_dir).iterdir():
         if f.is_file():
