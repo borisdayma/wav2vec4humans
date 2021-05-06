@@ -1,5 +1,5 @@
 program: run_common_voice.py
-project: xlsr-en-punctuation
+project: wav2vec4humans
 method: random
 metric:
   name: test/cer

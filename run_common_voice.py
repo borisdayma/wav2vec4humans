@@ -305,7 +305,7 @@ def main():
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     # override default run name
-    wandb.init(project="xlsr-en-punctuation", config=parser.parse_args())
+    wandb.init(project="wav2vec4humans", config=parser.parse_args())
 
     # Detecting last checkpoint.
     last_checkpoint = None
