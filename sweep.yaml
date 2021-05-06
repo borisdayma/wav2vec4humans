@@ -1,48 +1,43 @@
 program: run_common_voice.py
-# if using a common dashboard, you can use wandb ; if unspecified, it's your own workspace
-entity: wandb
-# if using wandb dashboards, check created dashboards such as xlsr-french
-project: xlsr
-# right now I do a random search but if you're in optimizing phase, you could try "bayes"
+project: xlsr-en-punctuation
 method: random
 metric:
-  name: test/wer
+  name: test/cer
   goal: minimize
 parameters:
   attention_dropout:
     distribution: log_uniform
-    # from 0.1/2 to 0.1*2 - values provided are ln(min) -> ln(max)
-    min: -3.4
-    max: -1.2
+    # from 0.1/5 to 0.1*5 - values provided are ln(min) -> ln(max)
+    min: -3.9
+    max: -0.7
   activation_dropout:
     distribution: log_uniform
-    min: -3.4
-    max: -1.2
+    min: -3.9
+    max: -0.7
   hidden_dropout:
     distribution: log_uniform
-    min: -3.4
-    max: -1.2
+    min: -3.9
+    max: -0.7
   feat_proj_dropout:
     distribution: log_uniform
-    min: -3.4
-    max: -1.2
+    min: -3.9
+    max: -0.7
   mask_time_prob:
     distribution: log_uniform
-    # from 0.05/2 to 0.05*2 - values provided are ln(min) -> ln(max)
-    min: -4.1
-    max: -1.9
+    min: -3.9
+    max: -1.6
   layerdrop:
     distribution: log_uniform
     # from 0.05/2 to 0.05*2 - values provided are ln(min) -> ln(max)
-    min: -3.4
-    max: -1.2
+    min: -4.6
+    max: -1.6
   learning_rate:
     distribution: log_uniform
     min: -9.2
     max: -6.9
   gradient_accumulation_steps:
     distribution: int_uniform
-    min: 1
+    min: 2
     max: 4
 command:
   - python
@@ -50,12 +45,15 @@ command:
   - "--model_name_or_path"
   - "facebook/wav2vec2-large-xlsr-53"
   - "--dataset_config_name"
-  - "tr"
+  - "en"
+  # we only train on 10% of data
+  - "--train_split_name"
+  - "train[:10%]"
   - "--output_dir"
   - "./model"
   - "--overwrite_output_dir"
   - "--num_train_epochs"
-  - 10
+  - 3
   - "--per_device_train_batch_size"
   - 16
   - "--evaluation_strategy"
@@ -74,7 +72,7 @@ command:
   - 500
   - "--load_best_model_at_end"
   - "--metric_for_best_model"
-  - "wer"
+  - "cer"
   - "--greater_is_better"
   - "False"
   - ${args}

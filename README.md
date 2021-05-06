@@ -19,8 +19,7 @@ Sweeps ongoing:
 
 * create a sweep -> this will return a sweep id
 
-  * `wandb sweep sweep.yaml` for an initial random search
-  * `wandb sweep sweep_finetuning.yaml` for a bayesian search
+  `wandb sweep sweep.yaml`
 
 * launch an agent against the sweep
 
