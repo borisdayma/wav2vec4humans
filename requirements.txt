@@ -1,6 +1,7 @@
 wandb
-git+git://github.com/huggingface/transformers@master#egg=transformers
+transformers
 datasets
+unidecode
 torch>=1.5.0
 torchaudio
 jiwer==2.2.0
