@@ -8,6 +8,8 @@ import sys
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Union
+from inspect import getframeinfo, stack
+import time
 
 import datasets
 import numpy as np
@@ -46,6 +48,10 @@ logger = logging.getLogger(__name__)
 def list_field(default=None, metadata=None):
     return field(default_factory=lambda: default, metadata=metadata)
 
+# adapted from https://stackoverflow.com/a/24439444/3474490
+def debuginfo():
+    caller = getframeinfo(stack()[1][0])
+    logger.info(f"DEBUG - line {caller.lineno} - time {time.process_time()}")
 
 @dataclass
 class ModelArguments:
@@ -349,64 +355,133 @@ def main():
     # Set seed before initializing model.
     set_seed(training_args.seed)
 
-    # Get the datasets:
-    train_dataset = datasets.load_dataset(
-        "common_voice", data_args.dataset_config_name, split=data_args.train_split_name
-    )
-    eval_dataset = datasets.load_dataset(
-        "common_voice", data_args.dataset_config_name, split="test"
-    )
-
-    # Create and save tokenizer
     chars_to_ignore_regex = f'[{"".join(data_args.chars_to_ignore)}]'
-
     def remove_special_characters(batch, train=True):
         val = re.sub(chars_to_ignore_regex, "", unidecode(batch["sentence"])).lower()
         batch["text"] = re.sub("&", "and", val + " " if train else val)
         return batch
-
-    train_dataset = train_dataset.map(
-        remove_special_characters, remove_columns=["sentence"]
-    )
-    eval_dataset = eval_dataset.map(
-        remove_special_characters, remove_columns=["sentence"]
-    )
-
+    
     def extract_all_chars(batch):
         all_text = " ".join(batch["text"])
         vocab = list(set(all_text))
         return {"vocab": [vocab], "all_text": [all_text]}
+    
+    resampler = dict()
+    def get_resampler(sampling_rate):
+        if sampling_rate in resampler.keys():
+            return resampler[sampling_rate]
+        else:
+            logger.info(f"Creating new resampler for {sampling_rate}")
+            resampler[sampling_rate] = torchaudio.transforms.Resample(
+                sampling_rate, 16_000
+            )
+            return resampler[sampling_rate]
+    
+    # Preprocessing the datasets.
+    # We need to read the audio files as arrays and tokenize the targets.
+    def speech_file_to_array_fn(batch):
+        speech_array, sampling_rate = torchaudio.load(batch["path"])
+        batch["speech"] = get_resampler(sampling_rate)(speech_array).squeeze().numpy()
+        batch["sampling_rate"] = 16_000
+        batch["target_text"] = batch["text"]
+        batch["duration"] = len(speech_array.squeeze()) / sampling_rate  # for faster grouping by length
+        return batch
 
-    vocab_train = train_dataset.map(
-        extract_all_chars,
-        batched=True,
-        batch_size=-1,
-        keep_in_memory=True,
-        remove_columns=train_dataset.column_names,
-    )
-    vocab_test = train_dataset.map(
-        extract_all_chars,
-        batched=True,
-        batch_size=-1,
-        keep_in_memory=True,
-        remove_columns=eval_dataset.column_names,
-    )
+    def filter_by_duration(batch):
+        return (
+            batch["duration"] <= 10
+            and batch["duration"] >= 1
+            and len(batch["target_text"]) > 5
+        )  # about 98% of samples
+    
+    def prepare_dataset(batch):
+        # check that all files have the correct sampling rate
+        assert (
+            len(set(batch["sampling_rate"])) == 1
+        ), f"Make sure all inputs have the same sampling rate of {processor.feature_extractor.sampling_rate}."
+        batch["input_values"] = processor(
+            batch["speech"], sampling_rate=batch["sampling_rate"][0]
+        ).input_values
+        batch["length"] = len(batch["input_values"])
+        # Setup the processor for targets
+        with processor.as_target_processor():
+            batch["labels"] = processor(batch["target_text"]).input_ids
+        return batch
 
-    vocab_list = list(set(vocab_train["vocab"][0]) | set(vocab_test["vocab"][0]))
-    vocab_dict = {v: k for k, v in enumerate(vocab_list)}
-    vocab_dict["|"] = vocab_dict[" "]
-    del vocab_dict[" "]
-    vocab_dict["[UNK]"] = len(vocab_dict)
-    vocab_dict["[PAD]"] = len(vocab_dict)
+    # Get the datasets:
+    dataset_train_path = f'datasets/{data_args.dataset_config_name}/train/{data_args.train_split_name}_{data_args.per_device_train_batch_size}'
+    dataset_eval_path = f'datasets/{data_args.dataset_config_name}/eval/{data_args.per_device_train_batch_size}'
+    dataset_test_path = f'datasets/{data_args.dataset_config_name}/test/{data_args.per_device_train_batch_size}'
 
-    with open("vocab.json", "w") as vocab_file:
-        json.dump(vocab_dict, vocab_file)
+    train_dataset = None
+    eval_dataset = None if training_args.do_eval else False
 
+    debuginfo()
+    if Path(dataset_train_path).exists():
+        train_dataset = datasets.load_from_disk(dataset_train_path)
+    else:
+        train_dataset = datasets.load_dataset(
+            "common_voice", data_args.dataset_config_name, split=data_args.train_split_name
+        )
+        train_dataset = train_dataset.map(
+            remove_special_characters, remove_columns=["sentence"]
+        )
+    
+    debuginfo()
+    if training_args.do_eval:
+        if Path(dataset_eval_path).exists():
+            eval_dataset = datasets.load_from_disk(dataset_eval_path)
+        else:
+            eval_dataset = datasets.load_dataset(
+                "common_voice", data_args.dataset_config_name, split="test"
+            )
+            eval_dataset = eval_dataset.map(
+                remove_special_characters, remove_columns=["sentence"]
+            )
+    
+    debuginfo()
+    if Path(dataset_test_path).exists():
+        test_dataset = datasets.load_from_disk(dataset_test_path)
+    else:
+        test_dataset = datasets.load_dataset(
+            "common_voice", data_args.dataset_config_name, split="test"
+        )
+        test_dataset = test_dataset.map(
+            lambda x:remove_special_characters(x, train=False), remove_columns=["sentence"]
+        )
+    
+    debuginfo()
+    if not Path(dataset_train_path).exists() or not Path(dataset_test_path).exists():
+        # create vocab
+        vocab_train = train_dataset.map(
+            extract_all_chars,
+            batched=True,
+            batch_size=-1,
+            keep_in_memory=True,
+            remove_columns=train_dataset.column_names,
+        )
+        vocab_test = test_dataset.map(
+            extract_all_chars,
+            batched=True,
+            batch_size=-1,
+            keep_in_memory=True,
+            remove_columns=test_dataset.column_names,
+        )
+        vocab_list = list(set(vocab_train["vocab"][0]) | set(vocab_test["vocab"][0]))
+        vocab_dict = {v: k for k, v in enumerate(vocab_list)}
+        vocab_dict["|"] = vocab_dict[" "]
+        del vocab_dict[" "]
+        vocab_dict["[UNK]"] = len(vocab_dict)
+        vocab_dict["[PAD]"] = len(vocab_dict)
+        with open("vocab.json", "w") as vocab_file:
+            json.dump(vocab_dict, vocab_file)
+    
     # Load pretrained model and tokenizer
     #
     # Distributed training:
     # The .from_pretrained methods guarantee that only one local process can concurrently
     # download model & vocab.
+    debuginfo()
     tokenizer = Wav2Vec2CTCTokenizer(
         "vocab.json",
         unk_token="[UNK]",
@@ -438,88 +513,57 @@ def main():
         vocab_size=len(processor.tokenizer),
     )
 
-    if data_args.max_train_samples is not None:
-        train_dataset = train_dataset.select(range(data_args.max_train_samples))
+    debuginfo()
+    if not Path(dataset_train_path).exists():
+        if data_args.max_train_samples is not None:
+            train_dataset = train_dataset.select(range(data_args.max_train_samples))
+        train_dataset = train_dataset.map(
+            speech_file_to_array_fn,
+            remove_columns=train_dataset.column_names,
+            num_proc=data_args.preprocessing_num_workers,
+        )
+        train_dataset = train_dataset.filter(filter_by_duration, remove_columns=["duration"])
+        train_dataset = train_dataset.map(
+            prepare_dataset,
+            remove_columns=train_dataset.column_names,
+            batch_size=training_args.per_device_train_batch_size,
+            batched=True,
+            num_proc=data_args.preprocessing_num_workers,
+        )
+        train_dataset.save_to_disk(dataset_train_path)
 
-    if data_args.max_val_samples is not None:
-        eval_dataset = eval_dataset.select(range(data_args.max_val_samples))
+    debuginfo()
+    if not Path(dataset_eval_path).exists() and if training_args.do_eval:
+        if data_args.max_val_samples is not None:
+            eval_dataset = eval_dataset.select(range(data_args.max_val_samples))
+        eval_dataset = eval_dataset.map(
+            speech_file_to_array_fn,
+            remove_columns=eval_dataset.column_names,
+            num_proc=data_args.preprocessing_num_workers,
+        )
+        eval_dataset = eval_dataset.filter(filter_by_duration, remove_columns=["duration"])
+        eval_dataset = eval_dataset.map(
+            prepare_dataset,
+            remove_columns=eval_dataset.column_names,
+            batch_size=training_args.per_device_eval_batch_size,
+            batched=True,
+            num_proc=data_args.preprocessing_num_workers,
+        )
+        eval_dataset.save_to_disk(dataset_eval_path)
 
-    resampler = dict()
-
-    def get_resampler(sampling_rate):
-        if sampling_rate in resampler.keys():
-            return resampler[sampling_rate]
-        else:
-            logger.info(f"Creating new resampler for {sampling_rate}")
-            resampler[sampling_rate] = torchaudio.transforms.Resample(
-                sampling_rate, 16_000
-            )
-            return resampler[sampling_rate]
-
-    # Preprocessing the datasets.
-    # We need to read the audio files as arrays and tokenize the targets.
-    def speech_file_to_array_fn(batch):
-        speech_array, sampling_rate = torchaudio.load(batch["path"])
-        batch["speech"] = get_resampler(sampling_rate)(speech_array).squeeze().numpy()
-        batch["sampling_rate"] = 16_000
-        batch["target_text"] = batch["text"]
-        batch["duration"] = len(speech_array.squeeze()) / sampling_rate
-        return batch
-
-    def filter_by_duration(batch):
-        return (
-            batch["duration"] <= 10
-            and batch["duration"] >= 1
-            and len(batch["target_text"]) > 5
-        )  # about 98% of samples
-
-    train_dataset = train_dataset.map(
-        speech_file_to_array_fn,
-        remove_columns=train_dataset.column_names,
-        num_proc=data_args.preprocessing_num_workers,
-    )
-    eval_dataset = eval_dataset.map(
-        speech_file_to_array_fn,
-        remove_columns=eval_dataset.column_names,
-        num_proc=data_args.preprocessing_num_workers,
-    )
-
-    train_dataset = train_dataset.filter(
-        filter_by_duration, remove_columns=["duration"]
-    )
-    eval_dataset = eval_dataset.filter(filter_by_duration, remove_columns=["duration"])
-
-    def prepare_dataset(batch):
-        # check that all files have the correct sampling rate
-        assert (
-            len(set(batch["sampling_rate"])) == 1
-        ), f"Make sure all inputs have the same sampling rate of {processor.feature_extractor.sampling_rate}."
-        batch["input_values"] = processor(
-            batch["speech"], sampling_rate=batch["sampling_rate"][0]
-        ).input_values
-        # Setup the processor for targets
-        with processor.as_target_processor():
-            batch["labels"] = processor(batch["target_text"]).input_ids
-        return batch
-
-    train_dataset = train_dataset.map(
-        prepare_dataset,
-        remove_columns=train_dataset.column_names,
-        batch_size=training_args.per_device_train_batch_size,
-        batched=True,
-        num_proc=data_args.preprocessing_num_workers,
-    )
-    eval_dataset = eval_dataset.map(
-        prepare_dataset,
-        remove_columns=eval_dataset.column_names,
-        batch_size=training_args.per_device_eval_batch_size,
-        batched=True,
-        num_proc=data_args.preprocessing_num_workers,
-    )
+    debuginfo()
+    if not Path(dataset_test_path).exists():
+        test_dataset = test_dataset.map(
+            speech_file_to_array_fn,
+            remove_columns=test_dataset.column_names,
+            num_proc=data_args.preprocessing_num_workers,
+        )
+        test_dataset = test_dataset.filter(filter_by_duration, remove_columns=["duration"])
+        test_dataset.save_to_disk(dataset_test_path)
 
     # Metric
+    debuginfo()
     cer_metric = datasets.load_metric("cer")
-
     def compute_metrics(pred):
         pred_logits = pred.predictions
         pred_ids = np.argmax(pred_logits, axis=-1)
@@ -552,6 +596,7 @@ def main():
     )
 
     # Training
+    debuginfo()
     if training_args.do_train:
         if last_checkpoint is not None:
             checkpoint = last_checkpoint
@@ -579,12 +624,8 @@ def main():
         trainer.save_state()
 
     # Final test metrics
+    debuginfo()
     logger.info("*** Test ***")
-
-    def test_speech_file_to_array_fn(batch):
-        batch = remove_special_characters(batch, train=False)
-        batch = speech_file_to_array_fn(batch)
-        return batch
 
     def evaluate(batch):
         inputs = processor(
@@ -600,19 +641,10 @@ def main():
         return batch
 
     model.to("cuda")
-    test_dataset = datasets.load_dataset(
-        "common_voice", data_args.dataset_config_name, split="test"
-    )
-    test_dataset = test_dataset.map(
-        test_speech_file_to_array_fn,
-        remove_columns=test_dataset.column_names,
-        num_proc=data_args.preprocessing_num_workers,
-    )
-    test_dataset = test_dataset.filter(filter_by_duration, remove_columns=["duration"])
-
     result = test_dataset.map(
         evaluate, batched=True, batch_size=training_args.per_device_eval_batch_size
     )
+    debuginfo()
     test_cer = cer_metric.compute(
         predictions=result["pred_strings"], references=result["text"]
     )
@@ -622,6 +654,7 @@ def main():
     logger.info(f"test/cer = {test_cer}")
 
     # save model files
+    debuginfo()
     artifact = wandb.Artifact(
         name=f"model-{wandb.run.id}", type="model", metadata={"cer": test_cer}
     )
@@ -629,7 +662,6 @@ def main():
         if f.is_file():
             artifact.add_file(str(f))
     wandb.run.log_artifact(artifact)
-
 
 if __name__ == "__main__":
     main()

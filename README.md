@@ -1,6 +1,6 @@
 # Wav2Vec4Humans - Speech Recognition for Humans
 
-*Transcribe audio without having to pronounce punctuation*
+*Transcribe audio without pronuncing the punctuation*
 
 ## Introduction
 

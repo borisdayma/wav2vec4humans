@@ -48,7 +48,7 @@ command:
   - "en"
   # we only train on 10% of data
   - "--train_split_name"
-  - "train[:10%]"
+  - "train[:5%]"
   - "--output_dir"
   - "./model"
   - "--overwrite_output_dir"
@@ -58,23 +58,15 @@ command:
   - 16
   - "--per_device_eval_batch_size"
   - 8
-  - "--evaluation_strategy"
-  - "epoch"
   - "--fp16"
   - "--freeze_feature_extractor"
   - "--group_by_length"
   - "--gradient_checkpointing"
   - "--do_train"
-  - "--do_eval"
   - "--save_total_limit"
   - 1
   - "--logging_steps"
   - 100
   - "--warmup_steps"
   - 500
-  - "--load_best_model_at_end"
-  - "--metric_for_best_model"
-  - "cer"
-  - "--greater_is_better"
-  - "False"
   - ${args}
