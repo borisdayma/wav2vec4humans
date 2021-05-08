@@ -549,7 +549,6 @@ def main():
         )
         train_dataset = train_dataset.map(
             get_length,
-            remove_columns=["duration"],
             num_proc=data_args.preprocessing_num_workers,
         )
         train_dataset.save_to_disk(dataset_train_path)
@@ -577,7 +576,6 @@ def main():
         )
         eval_dataset = eval_dataset.map(
             get_length,
-            remove_columns=["duration"],
             num_proc=data_args.preprocessing_num_workers,
         )
         eval_dataset.save_to_disk(dataset_eval_path)
