@@ -409,9 +409,9 @@ def main():
         return batch
 
     # Get the datasets:
-    dataset_train_path = f'datasets/{data_args.dataset_config_name}/train/{data_args.train_split_name}_{data_args.per_device_train_batch_size}'
-    dataset_eval_path = f'datasets/{data_args.dataset_config_name}/eval/{data_args.per_device_train_batch_size}'
-    dataset_test_path = f'datasets/{data_args.dataset_config_name}/test/{data_args.per_device_train_batch_size}'
+    dataset_train_path = f'datasets/{data_args.dataset_config_name}/train/{data_args.train_split_name}_{training_args.per_device_train_batch_size}'
+    dataset_eval_path = f'datasets/{data_args.dataset_config_name}/eval/{training_args.per_device_train_batch_size}'
+    dataset_test_path = f'datasets/{data_args.dataset_config_name}/test/{training_args.per_device_train_batch_size}'
 
     train_dataset = None
     eval_dataset = None if training_args.do_eval else False
