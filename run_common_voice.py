@@ -533,7 +533,7 @@ def main():
         train_dataset.save_to_disk(dataset_train_path)
 
     debuginfo()
-    if not Path(dataset_eval_path).exists() and if training_args.do_eval:
+    if not Path(dataset_eval_path).exists() and training_args.do_eval:
         if data_args.max_val_samples is not None:
             eval_dataset = eval_dataset.select(range(data_args.max_val_samples))
         eval_dataset = eval_dataset.map(
