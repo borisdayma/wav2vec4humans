@@ -48,10 +48,12 @@ logger = logging.getLogger(__name__)
 def list_field(default=None, metadata=None):
     return field(default_factory=lambda: default, metadata=metadata)
 
+
 # adapted from https://stackoverflow.com/a/24439444/3474490
 def debuginfo():
     caller = getframeinfo(stack()[1][0])
-    logger.info(f"DEBUG - line {caller.lineno} - time {time.process_time()}")
+    logger.info(f"*** DEBUG *** - line {caller.lineno} - time {time.process_time()}")
+
 
 @dataclass
 class ModelArguments:
@@ -356,17 +358,19 @@ def main():
     set_seed(training_args.seed)
 
     chars_to_ignore_regex = f'[{"".join(data_args.chars_to_ignore)}]'
+
     def remove_special_characters(batch, train=True):
         val = re.sub(chars_to_ignore_regex, "", unidecode(batch["sentence"])).lower()
         batch["text"] = re.sub("&", "and", val + " " if train else val)
         return batch
-    
+
     def extract_all_chars(batch):
         all_text = " ".join(batch["text"])
         vocab = list(set(all_text))
         return {"vocab": [vocab], "all_text": [all_text]}
-    
+
     resampler = dict()
+
     def get_resampler(sampling_rate):
         if sampling_rate in resampler.keys():
             return resampler[sampling_rate]
@@ -376,7 +380,7 @@ def main():
                 sampling_rate, 16_000
             )
             return resampler[sampling_rate]
-    
+
     # Preprocessing the datasets.
     # We need to read the audio files as arrays and tokenize the targets.
     def speech_file_to_array_fn(batch):
@@ -384,7 +388,9 @@ def main():
         batch["speech"] = get_resampler(sampling_rate)(speech_array).squeeze().numpy()
         batch["sampling_rate"] = 16_000
         batch["target_text"] = batch["text"]
-        batch["duration"] = len(speech_array.squeeze()) / sampling_rate  # for faster grouping by length
+        batch["duration"] = (
+            len(speech_array.squeeze()) / sampling_rate
+        )  # for faster grouping by length
         return batch
 
     def filter_by_duration(batch):
@@ -393,7 +399,7 @@ def main():
             and batch["duration"] >= 1
             and len(batch["target_text"]) > 5
         )  # about 98% of samples
-    
+
     def prepare_dataset(batch):
         # check that all files have the correct sampling rate
         assert (
@@ -402,16 +408,20 @@ def main():
         batch["input_values"] = processor(
             batch["speech"], sampling_rate=batch["sampling_rate"][0]
         ).input_values
-        batch["length"] = len(batch["input_values"])
         # Setup the processor for targets
         with processor.as_target_processor():
             batch["labels"] = processor(batch["target_text"]).input_ids
         return batch
 
+    def get_length(item):
+        # speeds up grouping by length in pre-loaded dataset
+        item["length"] = len(item["input_values"])
+        return item
+
     # Get the datasets:
-    dataset_train_path = f'datasets/{data_args.dataset_config_name}/train/{data_args.train_split_name}_{training_args.per_device_train_batch_size}'
-    dataset_eval_path = f'datasets/{data_args.dataset_config_name}/eval/{training_args.per_device_train_batch_size}'
-    dataset_test_path = f'datasets/{data_args.dataset_config_name}/test/{training_args.per_device_train_batch_size}'
+    dataset_train_path = f"datasets/{data_args.dataset_config_name}/train/{data_args.train_split_name}_{training_args.per_device_train_batch_size}"
+    dataset_eval_path = f"datasets/{data_args.dataset_config_name}/eval/{training_args.per_device_train_batch_size}"
+    dataset_test_path = f"datasets/{data_args.dataset_config_name}/test/{training_args.per_device_train_batch_size}"
 
     train_dataset = None
     eval_dataset = None if training_args.do_eval else False
@@ -421,12 +431,14 @@ def main():
         train_dataset = datasets.load_from_disk(dataset_train_path)
     else:
         train_dataset = datasets.load_dataset(
-            "common_voice", data_args.dataset_config_name, split=data_args.train_split_name
+            "common_voice",
+            data_args.dataset_config_name,
+            split=data_args.train_split_name,
         )
         train_dataset = train_dataset.map(
             remove_special_characters, remove_columns=["sentence"]
         )
-    
+
     debuginfo()
     if training_args.do_eval:
         if Path(dataset_eval_path).exists():
@@ -438,7 +450,7 @@ def main():
             eval_dataset = eval_dataset.map(
                 remove_special_characters, remove_columns=["sentence"]
             )
-    
+
     debuginfo()
     if Path(dataset_test_path).exists():
         test_dataset = datasets.load_from_disk(dataset_test_path)
@@ -447,9 +459,10 @@ def main():
             "common_voice", data_args.dataset_config_name, split="test"
         )
         test_dataset = test_dataset.map(
-            lambda x:remove_special_characters(x, train=False), remove_columns=["sentence"]
+            lambda x: remove_special_characters(x, train=False),
+            remove_columns=["sentence"],
         )
-    
+
     debuginfo()
     if not Path(dataset_train_path).exists() or not Path(dataset_test_path).exists():
         # create vocab
@@ -475,7 +488,7 @@ def main():
         vocab_dict["[PAD]"] = len(vocab_dict)
         with open("vocab.json", "w") as vocab_file:
             json.dump(vocab_dict, vocab_file)
-    
+
     # Load pretrained model and tokenizer
     #
     # Distributed training:
@@ -522,12 +535,21 @@ def main():
             remove_columns=train_dataset.column_names,
             num_proc=data_args.preprocessing_num_workers,
         )
-        train_dataset = train_dataset.filter(filter_by_duration, remove_columns=["duration"])
+        train_dataset = train_dataset.filter(
+            filter_by_duration,
+            remove_columns=["duration"],
+            num_proc=data_args.preprocessing_num_workers,
+        )
         train_dataset = train_dataset.map(
             prepare_dataset,
             remove_columns=train_dataset.column_names,
             batch_size=training_args.per_device_train_batch_size,
             batched=True,
+            num_proc=data_args.preprocessing_num_workers,
+        )
+        train_dataset = train_dataset.map(
+            get_length,
+            remove_columns=["duration"],
             num_proc=data_args.preprocessing_num_workers,
         )
         train_dataset.save_to_disk(dataset_train_path)
@@ -541,12 +563,21 @@ def main():
             remove_columns=eval_dataset.column_names,
             num_proc=data_args.preprocessing_num_workers,
         )
-        eval_dataset = eval_dataset.filter(filter_by_duration, remove_columns=["duration"])
+        eval_dataset = eval_dataset.filter(
+            filter_by_duration,
+            remove_columns=["duration"],
+            num_proc=data_args.preprocessing_num_workers,
+        )
         eval_dataset = eval_dataset.map(
             prepare_dataset,
             remove_columns=eval_dataset.column_names,
             batch_size=training_args.per_device_eval_batch_size,
             batched=True,
+            num_proc=data_args.preprocessing_num_workers,
+        )
+        eval_dataset = eval_dataset.map(
+            get_length,
+            remove_columns=["duration"],
             num_proc=data_args.preprocessing_num_workers,
         )
         eval_dataset.save_to_disk(dataset_eval_path)
@@ -558,12 +589,15 @@ def main():
             remove_columns=test_dataset.column_names,
             num_proc=data_args.preprocessing_num_workers,
         )
-        test_dataset = test_dataset.filter(filter_by_duration, remove_columns=["duration"])
+        test_dataset = test_dataset.filter(
+            filter_by_duration, remove_columns=["duration"]
+        )
         test_dataset.save_to_disk(dataset_test_path)
 
     # Metric
     debuginfo()
     cer_metric = datasets.load_metric("cer")
+
     def compute_metrics(pred):
         pred_logits = pred.predictions
         pred_ids = np.argmax(pred_logits, axis=-1)
@@ -662,6 +696,7 @@ def main():
         if f.is_file():
             artifact.add_file(str(f))
     wandb.run.log_artifact(artifact)
+
 
 if __name__ == "__main__":
     main()
