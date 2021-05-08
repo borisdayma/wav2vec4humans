@@ -149,20 +149,6 @@ class DataTrainingArguments:
         default=None,
         metadata={"help": "The number of processes to use for the preprocessing."},
     )
-    max_train_samples: Optional[int] = field(
-        default=None,
-        metadata={
-            "help": "For debugging purposes or quicker training, truncate the number of training examples to this "
-            "value if set."
-        },
-    )
-    max_val_samples: Optional[int] = field(
-        default=None,
-        metadata={
-            "help": "For debugging purposes or quicker training, truncate the number of validation examples to this "
-            "value if set."
-        },
-    )
     chars_to_ignore: List[str] = list_field(
         default=['"', "()", "[\]", "`", "_", "+/=%|"],
         metadata={"help": "A list of characters to remove from the transcripts."},
@@ -418,7 +404,7 @@ def main():
         item["length"] = len(item["input_values"])
         return item
 
-    # Get the datasets:
+    # Get the datasets
     dataset_train_path = f"datasets/{data_args.dataset_config_name}/train/{data_args.train_split_name}_{training_args.per_device_train_batch_size}"
     dataset_eval_path = f"datasets/{data_args.dataset_config_name}/eval/{training_args.per_device_train_batch_size}"
     dataset_test_path = f"datasets/{data_args.dataset_config_name}/test/{training_args.per_device_train_batch_size}"
@@ -528,8 +514,6 @@ def main():
 
     debuginfo()
     if not Path(dataset_train_path).exists():
-        if data_args.max_train_samples is not None:
-            train_dataset = train_dataset.select(range(data_args.max_train_samples))
         train_dataset = train_dataset.map(
             speech_file_to_array_fn,
             remove_columns=train_dataset.column_names,
@@ -555,8 +539,6 @@ def main():
 
     debuginfo()
     if not Path(dataset_eval_path).exists() and training_args.do_eval:
-        if data_args.max_val_samples is not None:
-            eval_dataset = eval_dataset.select(range(data_args.max_val_samples))
         eval_dataset = eval_dataset.map(
             speech_file_to_array_fn,
             remove_columns=eval_dataset.column_names,
@@ -644,12 +626,7 @@ def main():
             processor.save_pretrained(training_args.output_dir)
 
         metrics = train_result.metrics
-        max_train_samples = (
-            data_args.max_train_samples
-            if data_args.max_train_samples is not None
-            else len(train_dataset)
-        )
-        metrics["train_samples"] = min(max_train_samples, len(train_dataset))
+        metrics["train_samples"] = len(train_dataset)
 
         trainer.log_metrics("train", metrics)
         trainer.save_metrics("train", metrics)
