@@ -566,7 +566,6 @@ def main():
     if not Path(dataset_test_path).exists():
         test_dataset = test_dataset.map(
             speech_file_to_array_fn,
-            remove_columns=test_dataset.column_names,
             num_proc=data_args.preprocessing_num_workers,
         )
         test_dataset = test_dataset.filter(
