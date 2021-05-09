@@ -680,6 +680,8 @@ def main():
         return batch
 
     model.to("cuda")
+    # no need to cache mapped test_dataset
+    datasets.set_caching_enabled(False)
     result = test_dataset.map(
         evaluate, batched=True, batch_size=training_args.per_device_eval_batch_size
     )
