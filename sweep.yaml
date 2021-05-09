@@ -1,4 +1,4 @@
-program: run_common_voice.py
+program: train.py
 project: wav2vec4humans
 method: random
 metric:
@@ -57,7 +57,7 @@ command:
   - "--per_device_train_batch_size"
   - 16
   - "--per_device_eval_batch_size"
-  - 8
+  - 16
   - "--fp16"
   - "--freeze_feature_extractor"
   - "--group_by_length"
