@@ -1,3 +1,5 @@
 wandb
 model
 datasets
+vocab.json
+.vscode

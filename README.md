@@ -58,6 +58,33 @@ You can also use [W&B sweeps](https://docs.wandb.ai/) to optimize hyper paramete
 
   `wandb agent my_sweep_id`
 
+## Run on OVH
+
+### Optional: Build a Docker image for OVH
+
+You can just use my docker image: [borisdayma/wav2vec4humans](https://hub.docker.com/r/borisdayma/wav2vec4humans)
+
+To build the docker :
+
+```
+$ docker build -t wav2vec4humans -f Dockerfile .
+```
+
+To push it to dockerhub:
+
+First create a repository on dockerhub
+```
+$ docker tag wav2vec4humans dockerhub-username/wav2vec4humans
+```
+
+To push it to dockerhub:
+
+```
+$ docker push dockerhub-username/wav2vec4humans
+```
+
+Note: docker based on [wav2vec2-sprint](https://github.com/patil-suraj/wav2vec2-sprint) from Suraj Patil.
+
 ## About
 
 *Built by Boris Dayma*
@@ -76,3 +103,13 @@ For more details, visit the project repository.
 ## Got questions about W&B?
 
 If you have any questions about using W&B to track your model performance and predictions, please reach out to the [slack community](http://bit.ly/wandb-forum).
+
+## Acknowledgements
+
+This project would not have been possible without the help of so many, in particular:
+
+* [W&B](http://docs.wandb.com/) for the great tracking & visualization tools for ML experiments ;
+* [HuggingFace](https://huggingface.co/) for providing a great framework for Natural Language Understanding ;
+* [wav2vec2-sprint](https://github.com/patil-suraj/wav2vec2-sprint) from Suraj Patil for helping me create the docker file ;
+* [OVH cloud](https://www.ovh.com/) for the great cloud computing infrastructure ;
+* the open source community who participated in the xlsr-wav2vec2 fine-tuning week and shared so many great tips!
