@@ -83,8 +83,6 @@ To push it to dockerhub:
 $ docker push dockerhub-username/wav2vec4humans
 ```
 
-Note: docker based on [wav2vec2-sprint](https://github.com/patil-suraj/wav2vec2-sprint) from Suraj Patil.
-
 ## About
 
 *Built by Boris Dayma*
