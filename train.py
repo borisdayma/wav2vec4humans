@@ -24,6 +24,7 @@ from transformers import (
     HfArgumentParser,
     Trainer,
     TrainingArguments,
+    TrainerCallback,
     Wav2Vec2CTCTokenizer,
     Wav2Vec2FeatureExtractor,
     Wav2Vec2ForCTC,
@@ -279,6 +280,24 @@ class CTCTrainer(Trainer):
             loss.backward()
 
         return loss.detach()
+
+
+class LossNaNStoppingCallback(TrainerCallback):
+    """
+    Stops training when loss is NaN.
+
+    Loss is accessed through last logged values so it is useful to set
+    :class:`~transformers.TrainingArguments` argument `logging_steps` to 1.
+    """
+
+    def __init__(self):
+        self.stopped = False
+
+    def on_log(self, args, state, control, logs=None, **kwargs):
+        if np.isnan(logs.get("loss", 0.0)):
+            self.stopped = True
+            control.should_training_stop = True
+            logger.info("Loss NaN detected, terminating training")
 
 
 def main():
@@ -608,6 +627,8 @@ def main():
         eval_dataset=eval_dataset if training_args.do_eval else None,
         tokenizer=processor.feature_extractor,
     )
+    loss_nan_stopping_callback = LossNaNStoppingCallback()
+    trainer.add_callback(loss_nan_stopping_callback)
 
     # Training
     debuginfo()
@@ -635,6 +656,15 @@ def main():
     # Final test metrics
     debuginfo()
     logger.info("*** Test ***")
+
+    if loss_nan_stopping_callback.stopped:
+        test_cer = 10.0
+        logger.info(
+            "Loss NaN detected, typically resulting in bad cer so we won't calculate it."
+        )
+        wandb.log({"test/cer": test_cer})
+        logger.info(f"test/cer = {test_cer}")
+        return
 
     def evaluate(batch):
         inputs = processor(
