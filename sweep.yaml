@@ -40,7 +40,7 @@ parameters:
     min: 2
     max: 4
 command:
-  - python
+  - python3
   - ${program}
   - "--model_name_or_path"
   - "facebook/wav2vec2-large-xlsr-53"

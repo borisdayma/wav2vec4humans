@@ -30,9 +30,6 @@ COPY docker/home-server.html /usr/bin/
 
 RUN chown -R 42420:42420 /workspace
 
-RUN ln -sf /usr/bin/python3 /usr/bin/python & \
-    ln -sf /usr/bin/pip3 /usr/bin/pip
-
 ENV LC_ALL=C.UTF-8 \
     LANG=C.UTF-8
 
