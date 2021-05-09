@@ -406,14 +406,15 @@ def main():
 
     # Get the datasets
     dataset_train_path = f"datasets/{data_args.dataset_config_name}/train/{data_args.train_split_name}_{training_args.per_device_train_batch_size}"
-    dataset_eval_path = f"datasets/{data_args.dataset_config_name}/eval/{training_args.per_device_train_batch_size}"
-    dataset_test_path = f"datasets/{data_args.dataset_config_name}/test/{training_args.per_device_train_batch_size}"
+    dataset_eval_path = f"datasets/{data_args.dataset_config_name}/eval/{training_args.per_device_eval_batch_size}"
+    dataset_test_path = f"datasets/{data_args.dataset_config_name}/test/{training_args.per_device_eval_batch_size}"
+    vocab_path = f"datasets/{data_args.dataset_config_name}/vocab/test_{data_args.train_split_name}"
 
     train_dataset = None
     eval_dataset = None if training_args.do_eval else False
 
     debuginfo()
-    if Path(dataset_train_path).exists():
+    if Path(dataset_train_path).exists() and Path(vocab_path).exists():
         train_dataset = datasets.load_from_disk(dataset_train_path)
     else:
         train_dataset = datasets.load_dataset(
@@ -438,7 +439,7 @@ def main():
             )
 
     debuginfo()
-    if Path(dataset_test_path).exists():
+    if Path(dataset_test_path).exists() and Path(vocab_path).exists():
         test_dataset = datasets.load_from_disk(dataset_test_path)
     else:
         test_dataset = datasets.load_dataset(
@@ -450,7 +451,7 @@ def main():
         )
 
     debuginfo()
-    if not Path(dataset_train_path).exists() or not Path(dataset_test_path).exists():
+    if not Path(vocab_path).exists():
         # create vocab
         vocab_train = train_dataset.map(
             extract_all_chars,
@@ -472,7 +473,7 @@ def main():
         del vocab_dict[" "]
         vocab_dict["[UNK]"] = len(vocab_dict)
         vocab_dict["[PAD]"] = len(vocab_dict)
-        with open("vocab.json", "w") as vocab_file:
+        with open(vocab_path, "w") as vocab_file:
             json.dump(vocab_dict, vocab_file)
 
     # Load pretrained model and tokenizer
@@ -482,7 +483,7 @@ def main():
     # download model & vocab.
     debuginfo()
     tokenizer = Wav2Vec2CTCTokenizer(
-        "vocab.json",
+        vocab_path,
         unk_token="[UNK]",
         pad_token="[PAD]",
         word_delimiter_token="|",
