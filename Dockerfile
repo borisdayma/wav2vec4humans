@@ -24,16 +24,16 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip && \
     librosa==0.8.0 \
     soundfile
 
-ENV LC_ALL=C.UTF-8 \
-    LANG=C.UTF-8
-
-RUN alias python=python3
-
 COPY train.py /workspace/
 
 COPY docker/home-server.html /usr/bin/
 
 RUN chown -R 42420:42420 /workspace
+
+RUN alias python=python3
+
+ENV LC_ALL=C.UTF-8 \
+    LANG=C.UTF-8
 
 WORKDIR /workspace
 ENTRYPOINT []
