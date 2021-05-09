@@ -1,2 +1,3 @@
-wandb/
-model/
+wandb
+model
+datasets
