@@ -60,27 +60,20 @@ You can also use [W&B sweeps](https://docs.wandb.ai/) to optimize hyper paramete
 
 ## Run on OVH
 
-### Optional: Build a Docker image for OVH
+#### Optional: Build a Docker image
 
-You can just use my docker image: [borisdayma/wav2vec4humans](https://hub.docker.com/r/borisdayma/wav2vec4humans)
+Note: you can just use my Docker image: [borisdayma/wav2vec4humans](https://hub.docker.com/r/borisdayma/wav2vec4humans)
 
-To build the docker :
-
-```
-$ docker build -t wav2vec4humans -f Dockerfile .
-```
-
-To push it to dockerhub:
-
-First create a repository on dockerhub
-```
-$ docker tag wav2vec4humans dockerhub-username/wav2vec4humans
-```
-
-To push it to dockerhub:
+To build your own Docker image:
 
 ```
-$ docker push dockerhub-username/wav2vec4humans
+$ docker build -t username/wav2vec4humans -f Dockerfile .
+```
+
+To push it to Docker Hub:
+
+```
+$ docker push username/wav2vec4humans
 ```
 
 ## About
