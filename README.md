@@ -90,13 +90,13 @@ $ ovhai job run \
         --gpu 1 \
         -v datasets@BHS:/workspace/datasets:rw:cache `#pre-processed datasets` \
         -v cache@BHS:/workspace/.cache:rw:cache `#cache requires high capacity` \
+        -e WANDB_API_KEY=xxxxx `#insert your key for auto-login` \
         borisdayma/wav2vec4humans `#you can choose your own docker image` \
-        -e WANBD_API_KEY=xxxxx `#insert your key for auto-login`
 ```
 
 Notes:
 
-* once your dataset is created, you can load the volume in "ro" instead of "rw" to avoid final sync
+* once your dataset is created, you can load the volume in "ro" (read-only) instead of "rw" to avoid final sync
 * you can automatically launch a command by adding `-- my_command`, for example `-- wandb agent my_sweep_id`
 * remove local cache `rm -rf ~/.cache/**` before terminating your instance or it will take a very long time to sync back to its object storage (and each time you try to reload it)
 * to remove cache storage in BHS region: `ovhai data delete -ay bhs cache && ovhai data delete -y bhs cache`
