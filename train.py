@@ -151,7 +151,7 @@ class DataTrainingArguments:
         metadata={"help": "The number of processes to use for the preprocessing."},
     )
     chars_to_ignore: List[str] = list_field(
-        default=['"', "()", "[\]", "`", "_", "+/=%|"],
+        default=['"', "'", "()", "[\]", "`", "_", "+/=%|"],
         metadata={"help": "A list of characters to remove from the transcripts."},
     )
 
@@ -365,8 +365,8 @@ def main():
     chars_to_ignore_regex = f'[{"".join(data_args.chars_to_ignore)}]'
 
     def remove_special_characters(batch, train=True):
-        val = re.sub(chars_to_ignore_regex, "", unidecode(batch["sentence"])).lower()
-        batch["text"] = re.sub("&", "and", val + " " if train else val)
+        batch["text"] = re.sub(chars_to_ignore_regex, "", unidecode(batch["sentence"])).lower().strip()
+        if train: batch["text"] += " "
         return batch
 
     def extract_all_chars(batch):
@@ -597,6 +597,8 @@ def main():
     # Metric
     debuginfo()
     cer_metric = datasets.load_metric("cer")
+    # we use a custom WER that considers punctuation
+    wer_metric = datasets.load_metric("metrics/wer_punctuation.py")
 
     def compute_metrics(pred):
         pred_logits = pred.predictions
@@ -609,8 +611,9 @@ def main():
         label_str = processor.batch_decode(pred.label_ids, group_tokens=False)
 
         cer = cer_metric.compute(predictions=pred_str, references=label_str)
+        wer = wer_metric.compute(predictions=pred_str, references=label_str)
 
-        return {"cer": cer}
+        return {"cer": cer, "wer": wer}
 
     if model_args.freeze_feature_extractor:
         model.freeze_feature_extractor()
@@ -690,10 +693,13 @@ def main():
     test_cer = cer_metric.compute(
         predictions=result["pred_strings"], references=result["text"]
     )
-    wandb.log({"test/cer": test_cer})
-    metrics = {"cer": test_cer}
+    test_wer = wer_metric.compute(
+        predictions=result["pred_strings"], references=result["text"]
+    )
+    metrics = {"cer": test_cer, "wer": test_wer}
+    wandb.log({f'test/{k}': v for k, v in metrics.items()})
     trainer.save_metrics("test", metrics)
-    logger.info(f"test/cer = {test_cer}")
+    logger.info(metrics)
 
     # save model files
     debuginfo()
