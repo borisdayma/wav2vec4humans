@@ -492,7 +492,7 @@ def main():
         del vocab_dict[" "]
         vocab_dict["[UNK]"] = len(vocab_dict)
         vocab_dict["[PAD]"] = len(vocab_dict)
-        Path(vocab_path).mkdir(exist_ok=True)
+        Path(vocab_path).parent.mkdir(parents=True, exist_ok=True)
         with open(vocab_path, "w") as vocab_file:
             json.dump(vocab_dict, vocab_file)
 
