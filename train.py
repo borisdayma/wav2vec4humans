@@ -662,40 +662,38 @@ def main():
     logger.info("*** Test ***")
 
     if loss_nan_stopping_callback.stopped:
-        test_cer = 1.0
+        test_cer, test_wer = 1.0, 1.0
         logger.info(
-            "Loss NaN detected, typically resulting in bad cer so we won't calculate it."
+            "Loss NaN detected, typically resulting in bad WER & CER so we won't calculate them."
         )
-        wandb.log({"test/cer": test_cer})
-        logger.info(f"test/cer = {test_cer}")
-        return
+    else:
+        def evaluate(batch):
+            inputs = processor(
+                batch["speech"], sampling_rate=16_000, return_tensors="pt", padding=True
+            )
+            with torch.no_grad():
+                logits = model(
+                    inputs.input_values.to("cuda"),
+                    attention_mask=inputs.attention_mask.to("cuda"),
+                ).logits
+            pred_ids = torch.argmax(logits, dim=-1)
+            batch["pred_strings"] = processor.batch_decode(pred_ids)
+            return batch
 
-    def evaluate(batch):
-        inputs = processor(
-            batch["speech"], sampling_rate=16_000, return_tensors="pt", padding=True
+        model.to("cuda")
+        # no need to cache mapped test_dataset
+        datasets.set_caching_enabled(False)
+        result = test_dataset.map(
+            evaluate, batched=True, batch_size=training_args.per_device_eval_batch_size
         )
-        with torch.no_grad():
-            logits = model(
-                inputs.input_values.to("cuda"),
-                attention_mask=inputs.attention_mask.to("cuda"),
-            ).logits
-        pred_ids = torch.argmax(logits, dim=-1)
-        batch["pred_strings"] = processor.batch_decode(pred_ids)
-        return batch
+        debuginfo()
+        test_cer = cer_metric.compute(
+            predictions=result["pred_strings"], references=result["text"]
+        )
+        test_wer = wer_metric.compute(
+            predictions=result["pred_strings"], references=result["text"]
+        )
 
-    model.to("cuda")
-    # no need to cache mapped test_dataset
-    datasets.set_caching_enabled(False)
-    result = test_dataset.map(
-        evaluate, batched=True, batch_size=training_args.per_device_eval_batch_size
-    )
-    debuginfo()
-    test_cer = cer_metric.compute(
-        predictions=result["pred_strings"], references=result["text"]
-    )
-    test_wer = wer_metric.compute(
-        predictions=result["pred_strings"], references=result["text"]
-    )
     metrics = {"cer": test_cer, "wer": test_wer}
     wandb.log({f'test/{k}': v for k, v in metrics.items()})
     trainer.save_metrics("test", metrics)
@@ -703,13 +701,15 @@ def main():
 
     # save model files
     debuginfo()
-    artifact = wandb.Artifact(
-        name=f"model-{wandb.run.id}", type="model", metadata={"cer": test_cer}
-    )
-    for f in Path(training_args.output_dir).iterdir():
-        if f.is_file():
-            artifact.add_file(str(f))
-    wandb.run.log_artifact(artifact)
+    if not loss_nan_stopping_callback.stopped:
+        artifact = wandb.Artifact(
+            name=f"model-{wandb.run.id}", type="model", metadata={"cer": test_cer}
+        )
+        for f in Path(training_args.output_dir).iterdir():
+            if f.is_file():
+                artifact.add_file(str(f))
+        wandb.run.log_artifact(artifact)
+        debuginfo()
 
 
 if __name__ == "__main__":
