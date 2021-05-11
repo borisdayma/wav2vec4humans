@@ -2,7 +2,7 @@ program: train.py
 project: wav2vec4humans
 method: random
 metric:
-  name: test/cer
+  name: test/wer
   goal: minimize
 parameters:
   attention_dropout:
