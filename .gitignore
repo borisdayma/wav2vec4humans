@@ -2,4 +2,5 @@ wandb
 model
 datasets
 vocab*.json
+*.lock
 .vscode
