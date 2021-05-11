@@ -25,6 +25,7 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip && \
     soundfile
 
 COPY train.py /workspace/
+COPY metrics/ /workspace/metrics/
 
 COPY docker/home-server.html /usr/bin/
 
