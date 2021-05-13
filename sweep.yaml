@@ -12,12 +12,12 @@ parameters:
     max: -0.7
   activation_dropout:
     distribution: log_uniform
-    min: -1.9
-    max: -0.7
+    min: -3.9
+    max: -1.9
   hidden_dropout:
     distribution: log_uniform
-    min: -1.9
-    max: -0.7
+    min: -3.9
+    max: -1.9
   feat_proj_dropout:
     distribution: log_uniform
     min: -3.9
