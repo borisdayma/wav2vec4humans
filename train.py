@@ -662,7 +662,7 @@ def main():
     logger.info("*** Test ***")
 
     if loss_nan_stopping_callback.stopped:
-        test_cer, test_wer = 1.0, 1.0
+        test_cer, test_wer = 1.0, 2.0
         logger.info(
             "Loss NaN detected, typically resulting in bad WER & CER so we won't calculate them."
         )
