@@ -424,9 +424,9 @@ def main():
         return item
 
     # Get the datasets
-    dataset_train_path = f"datasets/{data_args.dataset_config_name}/train/{data_args.train_split_name}_{training_args.per_device_train_batch_size}"
-    dataset_eval_path = f"datasets/{data_args.dataset_config_name}/eval/{training_args.per_device_eval_batch_size}"
-    dataset_test_path = f"datasets/{data_args.dataset_config_name}/test/{training_args.per_device_eval_batch_size}"
+    dataset_train_path = f"datasets/{data_args.dataset_config_name}/train/{data_args.train_split_name}"
+    dataset_eval_path = f"datasets/{data_args.dataset_config_name}/eval"
+    dataset_test_path = f"datasets/{data_args.dataset_config_name}/test"
     vocab_path = f"datasets/{data_args.dataset_config_name}/vocab/vocab_test_{data_args.train_split_name}.json"
 
     train_dataset = None
