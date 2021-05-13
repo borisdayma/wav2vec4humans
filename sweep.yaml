@@ -12,11 +12,11 @@ parameters:
     max: -0.7
   activation_dropout:
     distribution: log_uniform
-    min: -3.9
+    min: -1.9
     max: -0.7
   hidden_dropout:
     distribution: log_uniform
-    min: -3.9
+    min: -1.9
     max: -0.7
   feat_proj_dropout:
     distribution: log_uniform
@@ -48,7 +48,7 @@ command:
   - "en"
   # we only train on 10% of data
   - "--train_split_name"
-  - "train[:5%]"
+  - "train[:10%]"
   - "--output_dir"
   - "./model"
   - "--overwrite_output_dir"
