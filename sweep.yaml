@@ -36,7 +36,6 @@ parameters:
     min: -9.2
     max: -6.9
   gradient_accumulation_steps:
-    distribution: int_uniform
     values:
     - 2
     - 4
