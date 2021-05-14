@@ -37,8 +37,9 @@ parameters:
     max: -6.9
   gradient_accumulation_steps:
     distribution: int_uniform
-    min: 2
-    max: 4
+    values:
+    - 2
+    - 4
 command:
   - python3
   - ${program}
