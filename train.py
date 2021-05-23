@@ -53,7 +53,9 @@ def list_field(default=None, metadata=None):
 # adapted from https://stackoverflow.com/a/24439444/3474490
 def debuginfo():
     caller = getframeinfo(stack()[1][0])
-    logger.info(f"*** DEBUG *** - line {caller.lineno} - time {time.process_time()}")
+    time_elapsed = time.process_time()
+    wandb.log({f"timestamps/line {caller.lineno}": time_elapsed})
+    logger.info(f"*** DEBUG *** - line {caller.lineno} - time {time_elapsed}")
 
 
 @dataclass
@@ -153,6 +155,9 @@ class DataTrainingArguments:
     chars_to_ignore: List[str] = list_field(
         default=['"', "'", "()", "[\]", "`", "_", "+/=%|"],
         metadata={"help": "A list of characters to remove from the transcripts."},
+    )
+    per_device_test_batch_size: Optional[int] = field(
+        default=8, metadata={"help": "Batch size per GPU/TPU core/CPU for testing."}
     )
 
 
@@ -300,6 +305,22 @@ class LossNaNStoppingCallback(TrainerCallback):
             logger.info("Loss NaN detected, terminating training")
 
 
+class TrainingStartedCallback(TrainerCallback):
+    """
+    Logs the moment first training step happened.
+    """
+
+    def __init__(self):
+        self.started = False
+
+    def on_log(self, args, state, control, logs=None, **kwargs):
+        if not self.started:
+            self.started = True
+            time_elapsed = time.process_time()
+            wandb.log({f"timestamps/training first step": time_elapsed})
+            logger.info(f"First step of training started at {time_elapsed} seconds.")
+
+
 def main():
     # See all possible arguments in src/transformers/training_args.py
     # or by passing the --help flag to this script.
@@ -317,7 +338,7 @@ def main():
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-    # override default run name
+    # override default run name and log all args
     wandb.init(project="wav2vec4humans", config=parser.parse_args())
 
     # Detecting last checkpoint.
@@ -365,8 +386,13 @@ def main():
     chars_to_ignore_regex = f'[{"".join(data_args.chars_to_ignore)}]'
 
     def remove_special_characters(batch, train=True):
-        batch["text"] = re.sub(chars_to_ignore_regex, "", unidecode(batch["sentence"])).lower().strip()
-        if train: batch["text"] += " "
+        batch["text"] = (
+            re.sub(chars_to_ignore_regex, "", unidecode(batch["sentence"]))
+            .lower()
+            .strip()
+        )
+        if train:
+            batch["text"] += " "
         return batch
 
     def extract_all_chars(batch):
@@ -423,11 +449,12 @@ def main():
         item["length"] = len(item["input_values"])
         return item
 
-    # Get the datasets
-    dataset_train_path = f"datasets/{data_args.dataset_config_name}/train/{data_args.train_split_name}"
-    dataset_eval_path = f"datasets/{data_args.dataset_config_name}/eval"
-    dataset_test_path = f"datasets/{data_args.dataset_config_name}/test"
-    vocab_path = f"datasets/{data_args.dataset_config_name}/vocab/vocab_test_{data_args.train_split_name}.json"
+    # Pre-processed datasets
+    dataset_path = Path(os.getenv("HF_HOME", ".")) / "datasets"
+    dataset_train_path = f"{dataset_path}/{data_args.dataset_config_name}/train/{data_args.train_split_name}"
+    dataset_eval_path = f"{dataset_path}/{data_args.dataset_config_name}/eval"
+    dataset_test_path = f"{dataset_path}/{data_args.dataset_config_name}/test"
+    vocab_path = f"{dataset_path}/{data_args.dataset_config_name}/vocab/vocab_test_{data_args.train_split_name}.json"
 
     train_dataset = None
     eval_dataset = None if training_args.do_eval else False
@@ -632,7 +659,9 @@ def main():
         tokenizer=processor.feature_extractor,
     )
     loss_nan_stopping_callback = LossNaNStoppingCallback()
+    training_started_callback = TrainingStartedCallback()
     trainer.add_callback(loss_nan_stopping_callback)
+    trainer.add_callback(training_started_callback)
 
     # Training
     debuginfo()
@@ -667,6 +696,7 @@ def main():
             "Loss NaN detected, typically resulting in bad WER & CER so we won't calculate them."
         )
     else:
+
         def evaluate(batch):
             inputs = processor(
                 batch["speech"], sampling_rate=16_000, return_tensors="pt", padding=True
@@ -695,7 +725,7 @@ def main():
         )
 
     metrics = {"cer": test_cer, "wer": test_wer}
-    wandb.log({f'test/{k}': v for k, v in metrics.items()})
+    wandb.log({f"test/{k}": v for k, v in metrics.items()})
     trainer.save_metrics("test", metrics)
     logger.info(metrics)
 
