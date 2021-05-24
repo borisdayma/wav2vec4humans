@@ -331,7 +331,11 @@ class TrainingStartedCallback(TrainerCallback):
     def __init__(self):
         self.started = False
 
-    def on_log(self, args, state, control, logs=None, **kwargs):
+    def on_step_begin(self, args, state, control, **kwargs):
+        if not self.started:
+            log_timestamp("trainer ready to start 1st step")
+    
+    def on_step_end(self, args, state, control, **kwargs):
         if not self.started:
             self.started = True
             log_timestamp("first training step")
@@ -639,7 +643,7 @@ def main():
         test_dataset = test_dataset.filter(
             filter_by_duration, remove_columns=["duration"]
         )
-        test_dataset.save_to_disk(dataset_test_path)
+        #test_dataset.save_to_disk(dataset_test_path)
     log_timestamp()
 
     # Metric
@@ -661,12 +665,15 @@ def main():
         wer = wer_metric.compute(predictions=pred_str, references=label_str)
 
         return {"cer": cer, "wer": wer}
+    log_timestamp()
 
     if model_args.freeze_feature_extractor:
         model.freeze_feature_extractor()
+        log_timestamp("freeze feature extractor")
 
     # Data collator
     data_collator = DataCollatorCTCWithPadding(processor=processor, padding=True)
+    log_timestamp("create data collator")
 
     # Initialize our Trainer
     trainer = CTCTrainer(
