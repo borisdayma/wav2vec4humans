@@ -52,7 +52,7 @@ def list_field(default=None, metadata=None):
 
 class Timer:
     """
-    Measure time elapsed
+    Measure time elapsed since start and since last measurement.
     """
 
     def __init__(self):
@@ -323,21 +323,22 @@ class LossNaNStoppingCallback(TrainerCallback):
             logger.info("Loss NaN detected, terminating training")
 
 
-class TrainingStartedCallback(TrainerCallback):
+class TimingCallback(TrainerCallback):
     """
-    Logs the moment first training step happened.
+    Logs some interesting timestamps.
     """
 
     def __init__(self):
-        self.started = False
+        self.training_started = False
+        self.evaluation_started = False
 
     def on_step_begin(self, args, state, control, **kwargs):
-        if not self.started:
+        if not self.training_started:
             log_timestamp("trainer ready to start 1st step")
     
     def on_step_end(self, args, state, control, **kwargs):
-        if not self.started:
-            self.started = True
+        if not self.training_started:
+            self.training_started = True
             log_timestamp("first training step")
 
 
@@ -602,13 +603,13 @@ def main():
             num_proc=data_args.preprocessing_num_workers,
         )
         log_timestamp("process data")
-        train_dataset = train_dataset.map(
-            get_length,
-            num_proc=data_args.preprocessing_num_workers,
-        )
-        log_timestamp("add input length")
-        train_dataset.save_to_disk(dataset_train_path)
-        log_timestamp("save to disk")
+        # train_dataset = train_dataset.map(
+        #     get_length,
+        #     num_proc=data_args.preprocessing_num_workers,
+        # )
+        # log_timestamp("add input length")
+        # train_dataset.save_to_disk(dataset_train_path)
+        # log_timestamp("save to disk")
 
     if not Path(dataset_eval_path).exists() and training_args.do_eval:
         eval_dataset = eval_dataset.map(
@@ -628,11 +629,11 @@ def main():
             batched=True,
             num_proc=data_args.preprocessing_num_workers,
         )
-        eval_dataset = eval_dataset.map(
-            get_length,
-            num_proc=data_args.preprocessing_num_workers,
-        )
-        eval_dataset.save_to_disk(dataset_eval_path)
+        # eval_dataset = eval_dataset.map(
+        #     get_length,
+        #     num_proc=data_args.preprocessing_num_workers,
+        # )
+        # eval_dataset.save_to_disk(dataset_eval_path)
     log_timestamp()
 
     if not Path(dataset_test_path).exists():
@@ -686,9 +687,9 @@ def main():
         tokenizer=processor.feature_extractor,
     )
     loss_nan_stopping_callback = LossNaNStoppingCallback()
-    training_started_callback = TrainingStartedCallback()
+    timing_callback = TimingCallback()
     trainer.add_callback(loss_nan_stopping_callback)
-    trainer.add_callback(training_started_callback)
+    trainer.add_callback(timing_callback)
 
     # Training
     log_timestamp("setup trainer")
