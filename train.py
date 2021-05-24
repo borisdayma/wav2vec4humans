@@ -50,12 +50,13 @@ def list_field(default=None, metadata=None):
     return field(default_factory=lambda: default, metadata=metadata)
 
 
-# adapted from https://stackoverflow.com/a/24439444/3474490
-def debuginfo():
+def log_timestamp(msg=None):
     caller = getframeinfo(stack()[1][0])
     time_elapsed = time.process_time()
-    wandb.log({f"timestamps/line {caller.lineno}": time_elapsed})
-    logger.info(f"*** DEBUG *** - line {caller.lineno} - time {time_elapsed}")
+    if msg is None:
+        msg = f"line {caller.lineno}"
+    wandb.log({f"timestamps/{msg}": time_elapsed})
+    logger.info(f"*** TIMESTAMP *** - {msg} - {time_elapsed} seconds")
 
 
 @dataclass
@@ -316,9 +317,7 @@ class TrainingStartedCallback(TrainerCallback):
     def on_log(self, args, state, control, logs=None, **kwargs):
         if not self.started:
             self.started = True
-            time_elapsed = time.process_time()
-            wandb.log({f"timestamps/training first step": time_elapsed})
-            logger.info(f"First step of training started at {time_elapsed} seconds.")
+            log_timestamp("training first step")
 
 
 def main():
@@ -459,7 +458,7 @@ def main():
     train_dataset = None
     eval_dataset = None if training_args.do_eval else False
 
-    debuginfo()
+    log_timestamp()
     if Path(dataset_train_path).exists() and Path(vocab_path).exists():
         train_dataset = datasets.load_from_disk(dataset_train_path)
     else:
@@ -472,7 +471,7 @@ def main():
             remove_special_characters, remove_columns=["sentence"]
         )
 
-    debuginfo()
+    log_timestamp()
     if training_args.do_eval:
         if Path(dataset_eval_path).exists():
             eval_dataset = datasets.load_from_disk(dataset_eval_path)
@@ -484,7 +483,7 @@ def main():
                 remove_special_characters, remove_columns=["sentence"]
             )
 
-    debuginfo()
+    log_timestamp()
     if Path(dataset_test_path).exists() and Path(vocab_path).exists():
         test_dataset = datasets.load_from_disk(dataset_test_path)
     else:
@@ -496,7 +495,7 @@ def main():
             remove_columns=["sentence"],
         )
 
-    debuginfo()
+    log_timestamp()
     if not Path(vocab_path).exists():
         # create vocab
         vocab_train = train_dataset.map(
@@ -528,7 +527,7 @@ def main():
     # Distributed training:
     # The .from_pretrained methods guarantee that only one local process can concurrently
     # download model & vocab.
-    debuginfo()
+    log_timestamp()
     tokenizer = Wav2Vec2CTCTokenizer(
         vocab_path,
         unk_token="[UNK]",
@@ -560,7 +559,7 @@ def main():
         vocab_size=len(processor.tokenizer),
     )
 
-    debuginfo()
+    log_timestamp()
     if not Path(dataset_train_path).exists():
         train_dataset = train_dataset.map(
             speech_file_to_array_fn,
@@ -585,7 +584,7 @@ def main():
         )
         train_dataset.save_to_disk(dataset_train_path)
 
-    debuginfo()
+    log_timestamp()
     if not Path(dataset_eval_path).exists() and training_args.do_eval:
         eval_dataset = eval_dataset.map(
             speech_file_to_array_fn,
@@ -610,7 +609,7 @@ def main():
         )
         eval_dataset.save_to_disk(dataset_eval_path)
 
-    debuginfo()
+    log_timestamp()
     if not Path(dataset_test_path).exists():
         test_dataset = test_dataset.map(
             speech_file_to_array_fn,
@@ -622,7 +621,7 @@ def main():
         test_dataset.save_to_disk(dataset_test_path)
 
     # Metric
-    debuginfo()
+    log_timestamp()
     cer_metric = datasets.load_metric("cer")
     # we use a custom WER that considers punctuation
     wer_metric = datasets.load_metric("metrics/wer_punctuation.py")
@@ -664,7 +663,7 @@ def main():
     trainer.add_callback(training_started_callback)
 
     # Training
-    debuginfo()
+    log_timestamp()
     if training_args.do_train:
         if last_checkpoint is not None:
             checkpoint = last_checkpoint
@@ -687,7 +686,7 @@ def main():
         trainer.save_state()
 
     # Final test metrics
-    debuginfo()
+    log_timestamp()
     logger.info("*** Test ***")
 
     if loss_nan_stopping_callback.stopped:
@@ -716,7 +715,7 @@ def main():
         result = test_dataset.map(
             evaluate, batched=True, batch_size=training_args.per_device_eval_batch_size
         )
-        debuginfo()
+        log_timestamp()
         test_cer = cer_metric.compute(
             predictions=result["pred_strings"], references=result["text"]
         )
@@ -730,7 +729,7 @@ def main():
     logger.info(metrics)
 
     # save model files
-    debuginfo()
+    log_timestamp()
     if not loss_nan_stopping_callback.stopped:
         artifact = wandb.Artifact(
             name=f"model-{wandb.run.id}", type="model", metadata={"cer": test_cer}
@@ -739,7 +738,7 @@ def main():
             if f.is_file():
                 artifact.add_file(str(f))
         wandb.run.log_artifact(artifact)
-        debuginfo()
+        log_timestamp()
 
 
 if __name__ == "__main__":
