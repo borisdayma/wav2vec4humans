@@ -603,13 +603,13 @@ def main():
             num_proc=data_args.preprocessing_num_workers,
         )
         log_timestamp("process data")
-        # train_dataset = train_dataset.map(
-        #     get_length,
-        #     num_proc=data_args.preprocessing_num_workers,
-        # )
-        # log_timestamp("add input length")
-        # train_dataset.save_to_disk(dataset_train_path)
-        # log_timestamp("save to disk")
+        train_dataset = train_dataset.map(
+            get_length,
+            num_proc=data_args.preprocessing_num_workers,
+        )
+        log_timestamp("add input length")
+        train_dataset.save_to_disk(dataset_train_path)
+        log_timestamp("save to disk")
 
     if not Path(dataset_eval_path).exists() and training_args.do_eval:
         eval_dataset = eval_dataset.map(
@@ -629,11 +629,11 @@ def main():
             batched=True,
             num_proc=data_args.preprocessing_num_workers,
         )
-        # eval_dataset = eval_dataset.map(
-        #     get_length,
-        #     num_proc=data_args.preprocessing_num_workers,
-        # )
-        # eval_dataset.save_to_disk(dataset_eval_path)
+        eval_dataset = eval_dataset.map(
+            get_length,
+            num_proc=data_args.preprocessing_num_workers,
+        )
+        eval_dataset.save_to_disk(dataset_eval_path)
     log_timestamp()
 
     if not Path(dataset_test_path).exists():
@@ -644,7 +644,7 @@ def main():
         test_dataset = test_dataset.filter(
             filter_by_duration, remove_columns=["duration"]
         )
-        #test_dataset.save_to_disk(dataset_test_path)
+        test_dataset.save_to_disk(dataset_test_path)
     log_timestamp()
 
     # Metric
