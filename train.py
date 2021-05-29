@@ -29,6 +29,7 @@ from transformers import (
     Wav2Vec2FeatureExtractor,
     Wav2Vec2ForCTC,
     Wav2Vec2Processor,
+    EarlyStoppingCallback,
     is_apex_available,
     set_seed,
 )
@@ -171,7 +172,7 @@ class DataTrainingArguments:
         metadata={"help": "The number of processes to use for the preprocessing."},
     )
     chars_to_ignore: List[str] = list_field(
-        default=['"', "'", "()", "[\]", "`", "_", "+/=%|"],
+        default=['"', "()", "[\]", "`", "_", "+/=%|"],
         metadata={"help": "A list of characters to remove from the transcripts."},
     )
     per_device_test_batch_size: Optional[int] = field(
@@ -687,8 +688,10 @@ def main():
         tokenizer=processor.feature_extractor,
     )
     loss_nan_stopping_callback = LossNaNStoppingCallback()
+    early_stopping_callback = EarlyStoppingCallback()
     timing_callback = TimingCallback()
     trainer.add_callback(loss_nan_stopping_callback)
+    trainer.add(early_stopping_callback)
     trainer.add_callback(timing_callback)
 
     # Training
