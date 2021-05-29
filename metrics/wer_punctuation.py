@@ -67,7 +67,7 @@ Examples:
 
 class AddSpacesToPunctuation(tr.AbstractTransform):
     def process_string(self, s: str):
-        return re.sub("([.,:;?!&])", r" \1 ", s)
+        return re.sub("(['.,:;?!&])", r" \1 ", s)
 
 
 _transform = tr.Compose(
