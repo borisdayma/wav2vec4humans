@@ -691,7 +691,7 @@ def main():
     early_stopping_callback = EarlyStoppingCallback()
     timing_callback = TimingCallback()
     trainer.add_callback(loss_nan_stopping_callback)
-    trainer.add(early_stopping_callback)
+    trainer.add_callback(early_stopping_callback)
     trainer.add_callback(timing_callback)
 
     # Training
